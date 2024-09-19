@@ -2,12 +2,26 @@
 
 > 《超标量-姚》唤醒的定义：将被select电路选中的指令的目的寄存器编号和issue queue中的其他源寄存器的编号对比（面积大），将相等的源寄存器进行标记的过程。（该部分是核心设计）
 
-## Function
+## Module
 
-* `WakeupQueue` 模块是个FIFO，在uop入队后延迟一定的周期数出队。
-* 如果在 `IusseQueue` 里配置了 `fixedLatency` 参数，则会实例化 `numDeq` 个 `WakeupQueue`。
-* uop从 `IusseQueue` 出队送进FU执行时，也同时会被送入 `WakeupQueue`。当uop执行完毕，`WakeupQueue` 的延迟出队信号也同时有效，用于唤醒其它uop参与调度执行。
-* 当重定向信号有效时，将会冲刷晚于ROB指针（是否等于由level信号指定）进入ROB的uop。
+```scala
+class WakeupQueue(number: Int)(implicit p: Parameters) extends XSModule {}
+```
+
+## I/O
+
+```scala
+/* 
+    type ValidIO[+T <: Data] = Valid[T]
+    Synonyms, moved from main package object - maintain scope.
+    https://github.com/chipsalliance/chisel/blob/main/src/main/scala/chisel3/util/util.scala
+*/
+val io = IO(new Bundle {
+  val in  = Flipped(ValidIO(new MicroOp))
+  val out = ValidIO(new MicroOp)
+  val redirect = Flipped(ValidIO(new Redirect))
+}
+```
 
 |        Signal        | Direction  | Width |    Source     |    Target     |                       Description                        |
 | :------------------: | :--------: | :---: | :-----------: | :-----------: | :------------------------------------------------------: |
@@ -18,7 +32,7 @@
 |  `_bits_ctrl_rfWen`  |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
 |    `_bits_pdest`     |   input    | [7:0] | `IusseQueue`  | `WakeupQueue` |                                                          |
 | `_bits_robIdx_flag`  |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
-| `_bits_robIdx_value` |   input    |   8   | `IusseQueue`  | `WakeupQueue` |                                                          |
+| `_bits_robIdx_value` |   input    | [7:0] | `IusseQueue`  | `WakeupQueue` |                                                          |
 |      **io_out**      | **output** |       |               |               |        `WakeupQueue`的出队信号，用于唤醒相应的uop        |
 |        _valid        |   output   |   1   | `WakeupQueue` | `IusseQueue`  |                       出队信号有效                       |
 |   _bits_ctrl_rfWen   |   output   |   1   | `WakeupQueue` | `IusseQueue`  |                                                          |
@@ -28,4 +42,44 @@
 |  _bits_robIdx_flag   |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
 |  _bits_robIdx_value  |   input    | [7:0] | `IusseQueue`  | `WakeupQueue` |                                                          |
 |     _bits_level      |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
+
+## Function
+
+```scala
+  if (number < 0) {
+    io.out.valid := false.B
+    io.out.bits := DontCare
+  } else if(number == 0) {
+    io.in <> io.out
+    io.out.valid := io.in.valid
+    // NOTE: no delay bypass don't care redirect
+  } else {
+    val queue = Seq.fill(number)(RegInit(0.U.asTypeOf(new Bundle{
+      val valid = Bool()
+      val bits = new MicroOp
+    })))
+    queue(0).valid := io.in.valid && !io.in.bits.robIdx.needFlush(io.redirect)
+    queue(0).bits  := io.in.bits
+    (0 until (number-1)).map{i =>
+      queue(i+1) := queue(i)
+      queue(i+1).valid := queue(i).valid && !queue(i).bits.robIdx.needFlush(io.redirect)
+    }
+    io.out.valid := queue(number-1).valid
+    io.out.bits := queue(number-1).bits
+
+    // debug
+
+    // for (i <- 0 until number) {
+    //   XSDebug(queue(i).valid, p"BPQue(${i.U}): pc:${Hexadecimal(queue(i).bits.cf.pc)} robIdx:${queue(i).bits.robIdx}" +
+    //     p" pdest:${queue(i).bits.pdest} rfWen:${queue(i).bits.ctrl.rfWen} fpWen:${queue(i).bits.ctrl.fpWen} vecWen:${queue(i).bits.ctrl.vecWen}\n")
+    // }
+  }
+```
+
+* `WakeupQueue` 模块是个FIFO，在uop入队后延迟一定的周期数出队。
+* 如果在 `IusseQueue` 里配置了 `fixedLatency` 参数，则会实例化 `numDeq` 个 `WakeupQueue`。
+* uop从 `IusseQueue` 出队送进FU执行时，也同时会被送入 `WakeupQueue`。当uop执行完毕，`WakeupQueue` 的延迟出队信号也同时有效，用于唤醒其它uop参与调度执行。
+* 当重定向信号有效时，将会冲刷晚于ROB指针（是否等于由level信号指定）进入ROB的uop。
+
+### CircularQueuePtr 循环队列指针
 
