@@ -13,32 +13,32 @@ import xiangshan.backend.fu.FuConfig
 import xiangshan.backend.decode.{Imm, ImmUnion}
 
 package object xiangshan {
-//   object SrcType {
-//     def imm = "b0000".U
-//     def pc  = "b0000".U
-//     def xp  = "b0001".U
-//     def fp  = "b0010".U
-//     def vp  = "b0100".U
-//     def v0  = "b1000".U
-//     def no  = "b0000".U // this src read no reg but cannot be Any value
+  object SrcType {
+    def imm = "b0000".U
+    def pc  = "b0000".U
+    def xp  = "b0001".U
+    def fp  = "b0010".U
+    def vp  = "b0100".U
+    def v0  = "b1000".U
+    def no  = "b0000".U // this src read no reg but cannot be Any value
 
-//     // alias
-//     def reg = this.xp
-//     def DC  = imm // Don't Care
-//     def X   = BitPat("b0000")
+    // alias
+    def reg = this.xp
+    def DC  = imm // Don't Care
+    def X   = BitPat("b0000")
 
-//     def isPc(srcType: UInt) = srcType===pc
-//     def isImm(srcType: UInt) = srcType===imm
-//     def isReg(srcType: UInt) = srcType(0)
-//     def isXp(srcType: UInt) = srcType(0)
-//     def isFp(srcType: UInt) = srcType(1)
-//     def isVp(srcType: UInt) = srcType(2)
-//     def isV0(srcType: UInt) = srcType(3)
-//     def isPcOrImm(srcType: UInt) = isPc(srcType) || isImm(srcType)
-//     def isNotReg(srcType: UInt): Bool = !srcType.orR
-//     def isVfp(srcType: UInt) = isVp(srcType) || isFp(srcType)
-//     def apply() = UInt(4.W)
-//   }
+    def isPc(srcType: UInt) = srcType===pc
+    def isImm(srcType: UInt) = srcType===imm
+    def isReg(srcType: UInt) = srcType(0)
+    def isXp(srcType: UInt) = srcType(0)
+    def isFp(srcType: UInt) = srcType(1)
+    def isVp(srcType: UInt) = srcType(2)
+    def isV0(srcType: UInt) = srcType(3)
+    def isPcOrImm(srcType: UInt) = isPc(srcType) || isImm(srcType)
+    def isNotReg(srcType: UInt): Bool = !srcType.orR
+    def isVfp(srcType: UInt) = isVp(srcType) || isFp(srcType)
+    def apply() = UInt(4.W)
+  }
 
 //   object SrcState {
 //     def busy    = "b0".U
@@ -51,11 +51,11 @@ package object xiangshan {
 //   }
 
 //   def FuOpTypeWidth = 9
-//   object FuOpType {
-//     def apply() = UInt(FuOpTypeWidth.W)
-//     def X     = BitPat("b0_0000_0000")
-//     def FMVXF = BitPat("b1_1000_0000") //for fmv_x_d & fmv_x_w
-//   }
+  object FuOpType {
+    def apply() = UInt(FuOpTypeWidth.W)
+    def X     = BitPat("b0_0000_0000")
+    def FMVXF = BitPat("b1_1000_0000") //for fmv_x_d & fmv_x_w
+  }
 
 //   object I2fType {
 //     // move/cvt ## i64/i32(input) ## f64/f32/f16(output) ## hassign
@@ -160,21 +160,21 @@ package object xiangshan {
 //     def isBranch(commitType: UInt): Bool = commitType(0) && !commitType(1) && !isFused(commitType)
 //   }
 
-  object RedirectLevel {
-    def flushAfter = "b0".U
-    def flush      = "b1".U
+  // object RedirectLevel {
+  //   def flushAfter = "b0".U
+  //   def flush      = "b1".U
 
-    def apply() = UInt(1.W)
-    // def isUnconditional(level: UInt) = level(1)
-    def flushItself(level: UInt) = level(0)
-    // def isException(level: UInt) = level(1) && level(0)
-  }
+  //   def apply() = UInt(1.W)
+  //   // def isUnconditional(level: UInt) = level(1)
+  //   def flushItself(level: UInt) = level(0)
+  //   // def isException(level: UInt) = level(1) && level(0)
+  // }
 
-//   object ExceptionVec {
-//     val ExceptionVecSize = 24
-//     def apply() = Vec(ExceptionVecSize, Bool())
-//     def apply(init: Bool) = VecInit(Seq.fill(ExceptionVecSize)(init))
-//   }
+  // object ExceptionVec {
+  //   val ExceptionVecSize = 24
+  //   def apply() = Vec(ExceptionVecSize, Bool())
+  //   def apply(init: Bool) = VecInit(Seq.fill(ExceptionVecSize)(init))
+  // }
 
 //   object PMAMode {
 //     def R = "b1".U << 0 //readable

@@ -86,7 +86,7 @@ object Bundles {
 //     val ftqPtr          = new FtqPtr
 //     val ftqOffset       = UInt(log2Up(PredictWidth).W)
 //     // decoded
-//     val srcType         = Vec(numSrc, SrcType())
+    // val srcType         = Vec(numSrc, SrcType())
 //     val lsrc            = Vec(numSrc, UInt(LogicRegsWidth.W))
 //     val ldest           = UInt(LogicRegsWidth.W)
 //     val fuType          = FuType()
