@@ -5,7 +5,7 @@
 
 ## 写回唤醒
 
-略
+待续
 
 ## 一般快速唤醒 
 
@@ -56,7 +56,9 @@ val io = IO(new Bundle {
 
 #### 一些重要的 Class
 
-![class](Class.svg)
+> 图还是直接看drawio里的，我画的时候用的google导入字体和非格式化文本下很小的字号，svg渲染有问题。画Kunminghu时这个坑就不会踩了。
+
+![Alt text](Class.svg)
 
 #### RS <> WakeupQueue
 
@@ -101,6 +103,8 @@ val io = IO(new Bundle {
 * 当重定向信号有效时，将会冲刷晚于ROB指针（是否等于由level信号指定）进入ROB的uop。
 
 ### Tips: CircularQueuePtr 循环队列指针
+
+> 一个经常用到的 FIFO ptr Class
 
 ```scala
 package utility
@@ -257,4 +261,4 @@ trait HasCircularQueuePtrHelper {
 
 ## LoadUnit 快速唤醒
 
-略
+待续
