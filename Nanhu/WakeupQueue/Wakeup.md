@@ -1,14 +1,25 @@
-# WakeupQueue 唤醒队列
 
-> 《超标量-姚》唤醒的定义：将被select电路选中的指令的目的寄存器编号和issue queue中的其他源寄存器的编号对比（面积大），将相等的源寄存器进行标记的过程。（该部分是核心设计）
+# Xiangshan-Nanhu 唤醒机制
 
-## Module
+> 由于master分支里kunminghu uarch没有把WakeupQueue.scala删除，误以为这个文件被使用作为Kunminghu唤醒机制部分，后俩发现是Nanhu余孽，因此本文档分析的是Nanhu架构的WakeupQueue，用于一般快速唤醒机制，但是用的其他class之类的代码是Kunminghu主分支的，接口是对得上的但是没有被使用了，因此简单描述一下。
+
+## 写回唤醒
+
+略
+
+## 一般快速唤醒 
+
+### Fastwake WakeupQueue 唤醒队列
+
+> 《超标量-姚》唤醒的定义：将被select电路选中的指令的目的寄存器编号和issue queue (RS) 中的其他源寄存器的编号对比（面积大），将相等的源寄存器进行标记的过程。
+
+#### Module
 
 ```scala
 class WakeupQueue(number: Int)(implicit p: Parameters) extends XSModule {}
 ```
 
-## I/O
+#### I/O
 
 ```scala
 /* 
@@ -34,16 +45,24 @@ val io = IO(new Bundle {
 | `_bits_robIdx_flag`  |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
 | `_bits_robIdx_value` |   input    | [7:0] | `IusseQueue`  | `WakeupQueue` |                                                          |
 |      **io_out**      | **output** |       |               |               |        `WakeupQueue`的出队信号，用于唤醒相应的uop        |
-|        _valid        |   output   |   1   | `WakeupQueue` | `IusseQueue`  |                       出队信号有效                       |
-|   _bits_ctrl_rfWen   |   output   |   1   | `WakeupQueue` | `IusseQueue`  |                                                          |
-|     _bits_pdest      |   output   | [7:0] | `WakeupQueue` | `IusseQueue`  |                                                          |
-|   **io_indirect**    | **input**  |       |               |               |             用于冲刷WakeupQueue的重定向信号              |
-|        _valid        |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                       冲刷信号有效                       |
-|  _bits_robIdx_flag   |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
-|  _bits_robIdx_value  |   input    | [7:0] | `IusseQueue`  | `WakeupQueue` |                                                          |
-|     _bits_level      |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
+|       `_valid`       |   output   |   1   | `WakeupQueue` | `IusseQueue`  |                       出队信号有效                       |
+|  `_bits_ctrl_rfWen`  |   output   |   1   | `WakeupQueue` | `IusseQueue`  |                                                          |
+|    `_bits_pdest`     |   output   | [7:0] | `WakeupQueue` | `IusseQueue`  |                                                          |
+|   **io_redirect**    | **input**  |       |               |               |             用于冲刷WakeupQueue的重定向信号              |
+|       `_valid`       |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                       冲刷信号有效                       |
+| `_bits_robIdx_flag`  |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
+| `_bits_robIdx_value` |   input    | [7:0] | `IusseQueue`  | `WakeupQueue` |                                                          |
+|    `_bits_level`     |   input    |   1   | `IusseQueue`  | `WakeupQueue` |                                                          |
 
-## Function
+#### 一些重要的 Class
+
+![class](Class.svg)
+
+#### RS <> WakeupQueue
+
+![wuq](WakeupQueue.svg)
+
+#### Function
 
 ```scala
   if (number < 0) {
@@ -81,7 +100,7 @@ val io = IO(new Bundle {
 * uop从 `IusseQueue` 出队送进FU执行时，也同时会被送入 `WakeupQueue`。当uop执行完毕，`WakeupQueue` 的延迟出队信号也同时有效，用于唤醒其它uop参与调度执行。
 * 当重定向信号有效时，将会冲刷晚于ROB指针（是否等于由level信号指定）进入ROB的uop。
 
-### CircularQueuePtr 循环队列指针
+### Tips: CircularQueuePtr 循环队列指针
 
 ```scala
 package utility
@@ -139,8 +158,28 @@ class CircularQueuePtr[T <: CircularQueuePtr[T]](val entries: Int) extends Bundl
   }
 
   final def -(v: UInt): T = {
+    // 直接复用重载后的 '+'
+    /*
+      example:
+        this.ptr_value === 136 (entries === 256), v = 30
+        this.value(this - v)
+          === this + (256 - 30)
+          === this + 226 // 136 + 226 - 256 > 0 flag = !flag
+
+        this.ptr_value === 136 (entries === 150), v = 140
+        this.value(this - v)
+          === this + (150 - 140)
+          === this + 10 // 136 + 10 - 150 < 0 flag = flag
+    */
     val flipped_new_ptr = this + (this.entries.U - v)
     val new_ptr = Wire(this.asInstanceOf[T].cloneType)
+    /*
+      example:
+        this.ptr_value === 136 (entries === 256), v = 30
+        this.flag = this.!!flag
+        this.ptr_value === 136 (entries === 150), v = 140
+        this.flag = !this.flag
+    */
     new_ptr.flag := !flipped_new_ptr.flag
     new_ptr.value := flipped_new_ptr.value
     new_ptr
@@ -150,6 +189,8 @@ class CircularQueuePtr[T <: CircularQueuePtr[T]](val entries: Int) extends Bundl
 
   final def =/= (that: T): Bool = this.asUInt =/= that.asUInt
 
+  // 相同flag时，大的大，小的小
+  // 不同flag时，大的小，小的大
   final def > (that: T): Bool = {
     val differentFlag = this.flag ^ that.flag
     val compare = this.value > that.value
@@ -178,22 +219,24 @@ class CircularQueuePtr[T <: CircularQueuePtr[T]](val entries: Int) extends Bundl
 }
 
 trait HasCircularQueuePtrHelper {
-
+  // 是否为空
+  // enq_ptr 入队指针
+  // deq_ptr 出队指针
   def isEmpty[T <: CircularQueuePtr[T]](enq_ptr: T, deq_ptr: T): Bool = {
     enq_ptr === deq_ptr
   }
-
+  // 是否为满
   def isFull[T <: CircularQueuePtr[T]](enq_ptr: T, deq_ptr: T): Bool = {
     (enq_ptr.flag =/= deq_ptr.flag) && (enq_ptr.value === deq_ptr.value)
   }
-
+  // 出入队指针距离
   def distanceBetween[T <: CircularQueuePtr[T]](enq_ptr: T, deq_ptr: T): UInt = {
     assert(enq_ptr.entries == deq_ptr.entries)
     Mux(enq_ptr.flag === deq_ptr.flag,
       enq_ptr.value - deq_ptr.value,
       enq_ptr.entries.U + enq_ptr.value - deq_ptr.value)
   }
-
+  // 是否有free条目
   def hasFreeEntries[T <: CircularQueuePtr[T]](enq_ptr: T, deq_ptr: T): UInt = {
     val free_deq_ptr = enq_ptr
     val free_enq_ptr = WireInit(deq_ptr)
@@ -211,3 +254,7 @@ trait HasCircularQueuePtrHelper {
 }
 
 ```
+
+## LoadUnit 快速唤醒
+
+略
